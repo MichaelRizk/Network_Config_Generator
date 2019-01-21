@@ -1,0 +1,196 @@
+HOSTNAME {{HOSTNAME}}
+!
+vtp mode transparent
+!
+no ip routing
+!
+ip default-gateway 1.{{SCBN}}.1.1
+!
+!
+interface Vlan10
+ ip address 1.{{SCBN}}.1.{{MID}} 255.255.255.0
+!
+!
+{% if (STACK == '1') -%}
+switch 1 provision {{PID}}
+{% elif (STACK == '2') -%}
+switch 1 provision {{PID}}
+switch 2 provision {{PID}}
+{% elif (STACK == '3') -%}
+switch 1 provision {{PID}}
+switch 2 provision {{PID}}
+switch 3 provision {{PID}}
+{% elif (STACK == '4') -%}
+switch 1 provision {{PID}}
+switch 2 provision {{PID}}
+switch 3 provision {{PID}}
+switch 4 provision {{PID}}
+{% elif (STACK == '5') -%}
+switch 1 provision {{PID}}
+switch 2 provision {{PID}}
+switch 3 provision {{PID}}
+switch 4 provision {{PID}}
+switch 5 provision {{PID}}
+{% endif -%}
+!
+!
+!
+ip access-list standard SNMP-RO
+remark SNMP Read Only
+permit 1 x.x.x.x
+!
+ip access-list standard SNMP-RW
+remark SNMP Read/Write
+permit x.x.x.x
+!
+snmp-server system-shutdown
+snmp-server location {{LOCATION}}
+snmp-server ifindex persist
+!
+!
+snmp-server enable traps snmp authentication linkdown linkup coldstart warmstart
+snmp-server enable traps transceiver all
+snmp-server enable traps cpu threshold
+snmp-server enable traps vtp
+snmp-server enable traps vlancreate
+snmp-server enable traps vlandelete
+snmp-server enable traps flash insertion removal
+snmp-server enable traps envmon fan shutdown supply temperature status
+snmp-server enable traps stackwise
+snmp-server enable traps config-copy
+snmp-server enable traps config
+snmp-server enable traps energywise
+snmp-server enable traps bridge newroot topologychange
+snmp-server enable traps mac-notification change move threshold
+snmp-server enable traps errdisable
+snmp-server enable traps stpx inconsistency root-inconsistency loop-inconsistency
+snmp-server enable traps bridge newroot topologychange
+snmp-server enable traps license
+snmp-server enable traps syslog
+!
+!
+service password-encryption
+service timestamps log datetime msec year localtime show-timezone
+service timestamps debug datetime msec localtime
+no ip forward-protocol nd
+!
+no setup express
+no vstack
+!
+!
+aaa new-model
+tacacs server TACACS-GBDC01ISEP01
+ address ipv4 x.x.x.x
+ key {{TACACS_KEY}}
+ single-connection
+tacacs server TACACS-NLAMS1ISEP01
+ address ipv4 x.x.x.x
+ key {{TACACS_KEY}}
+ single-connection
+tacacs server TACACS-SGDC01ISEP01
+ address ipv4 x.x.x.x
+ key {{TACACS_KEY}}
+ single-connection
+tacacs server TACACS-AUDC01ISEP01
+ address ipv4 x.x.x.x
+ key {{TACACS_KEY}}
+ single-connection
+!
+aaa group server tacacs+ AAA-TACACS
+{% if (REGION == 'Asia') -%}
+ server name TACACS-SGDC01ISEP01
+ server name TACACS-AUDC01ISEP01
+ server name TACACS-NLAMS1ISEP01
+ server name TACACS-GBDC01ISEP01
+{% elif (REGION == 'AU') -%}
+ server name TACACS-AUDC01ISEP01
+ server name TACACS-SGDC01ISEP01
+ server name TACACS-NLAMS1ISEP01
+ server name TACACS-GBDC01ISEP01
+{% elif (REGION == 'EU') or (Region == 'UK')or (Region == 'ME') -%}
+ server name TACACS-NLAMS1ISEP01
+ server name TACACS-GBDC01ISEP01
+ server name TACACS-SGDC01ISEP01
+ server name TACACS-AUDC01ISEP01
+{% endif -%}
+ ip tacacs source-interface Vlan10	
+!
+!
+tacacs-server directed-request
+tacacs-server timeout 2
+!
+ip tacacs source-interface Vlan10
+!
+aaa accounting commands 1 default start-stop group AAA-TACACS
+aaa authorization commands 15 default group AAA-TACACS local
+!
+aaa session-id common
+!
+!
+ntp server 1.1.{{SCBN}}.1 prefer
+!
+!
+logging buffered 32768 notifications
+logging console debugging
+logging monitor debugging
+logging trap notifications
+logging host x.x.x.x
+logging source-interface Vlan10
+!
+!
+no ip domain-lookup
+ip domain-name dla.com
+!
+!
+{% if (REGION == 'Asia') -%}
+ip name-server x.x.x.x y.y.y.y
+{% elif (REGION == 'AU') -%}
+ip name-server x.x.x.x y.y.y.y
+{% elif (REGION == 'ME') -%}
+ip name-server x.x.x.x y.y.y.y
+{% elif (REGION == 'EU') or (Region == 'UK') -%}
+ip name-server x.x.x.x y.y.y.y
+{% endif -%}
+!
+!
+!
+!
+crypto key generate rsa
+2048
+
+ip ssh version 2
+ip ssh authentication-retries 5
+!
+ip scp server enable
+!
+no ip http server
+!
+line con 0
+ exec-timeout 30 0
+ logging synchronous
+!
+line vty 0 15
+ exec-timeout 30 0
+ logging synchronous
+ transport input ssh
+ transport preferred none
+!
+!
+spanning-tree mode rapid-pvst
+spanning-tree extend system-id
+!
+!
+errdisable recovery cause bpduguard
+errdisable recovery cause link-flap
+!
+!
+port-channel load-balance src-dst-mixed-ip-port
+!
+!
+{% for VLAN_ID, VLAN_NAME in vlanDict.iteritems() -%}
+vlan {{VLAN_ID}}
+ name {{VLAN_NAME}}
+{% endfor %}
+!
+!
+!
